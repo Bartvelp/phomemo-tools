@@ -1,8 +1,8 @@
 #! /usr/bin/python3
+# sudo rfcomm connect 0 F4:D7:32:46:5D:2C
+import sys, os
 
-import getopt, sys, os
-
-from PIL import Image
+from PIL import Image, ImageFont, ImageDraw
 
 def print_header():
     with os.fdopen(sys.stdout.fileno(), "wb", closefd=False) as stdout:
@@ -41,58 +41,32 @@ def print_line(image, line):
             stdout.write(byte.to_bytes(1, 'little'))
     return
 
-def usage():
-    print("%s [-h|--help] filename" % (sys.argv[0]))
-    return
+if __name__ == '__main__':
+    text = ' '.join(sys.argv[1:]).replace('\\n', '\n')
+    print('Printing:\n', text, file=sys.stderr)
+    lines = text.split('\n')
+    for line in lines:
+        if len(line) > 12:
+            sys.exit('Please pass a maximum of 12 chars per line')
+    image = Image.new("RGB", (384, 50 * len(lines)), (255, 255, 255))
 
-try:
-    opts, args = getopt.getopt(sys.argv[1:], "h", ["help"])
-except getopt.error as err:
-    print (str(err))
-    usage()
-    sys.exit(1)
+    # Draw text
+    draw = ImageDraw.Draw(image) 
+        
+    # drawing text size
+    myFont = ImageFont.truetype('DejaVuSans.ttf', 50)
+    for i, line in enumerate(lines):
+        draw.text((0, i * 50), line, font=myFont, fill=(0, 0, 0))
+    
+    # black&white printer: dithering
+    image = image.convert(mode='1')
+    # image.save("to_print.png", "PNG")
 
-for opt, arg in opts:
-    if opt in ("-h", "--help"):
-        usage()
-        sys.exit()
+    if image.height > 256:
+        sys.exit('Please keep text small')
 
-try:
-    name = sys.argv[1]
-except:
-    print("Missing filename")
-    usage()
-    sys.exit(1)
-
-try:
-    image = Image.open(name)
-except:
-    print("Cannot open file %s" % (name))
-    usage()
-    sys.exit(2)
-
-"""
-if image.width > image.height:
-    image = image.transpose(Image.ROTATE_90)
-
-# width 384 dots
-image = image.resize(size=(384, int(image.height * 384 / image.width)))
-"""
-# black&white printer: dithering
-image = image.convert(mode='1')
-image.save("would_print.png", "PNG")
-
-remaining = image.height
-line=0
-print_header()
-while remaining > 0:
-    lines = remaining
-    if lines > 256:
-        lines = 256
-    print_marker(lines)
-    remaining -= lines
-    while lines > 0:
-        print_line(image, line)
-        lines -= 1
-        line += 1
-print_footer()
+    print_header()
+    print_marker(image.height)
+    for y_i in range(image.height):
+        print_line(image, y_i)
+    print_footer()
